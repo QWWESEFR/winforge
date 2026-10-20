@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WinForge 软件发布站 · Windows 安装包发布与审核平台</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="/">
+      <span class="brand-logo">⬡</span>
+      <span class="brand-name">WinForge</span>
+      <span class="brand-tag">Windows 软件发布站</span>
+    </a>
+    <a class="btn btn-primary btn-publish" href="/publish.html">＋ 发布</a>
+  </div>
+</header>
+
+<main class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-content">
+    <h1>分享你的 Windows 安装包</h1>
+    <p>安全 · 高效 · 值得信赖的软件发布与审核平台</p>
+    <div class="hero-actions">
+      <a class="btn btn-primary btn-lg" href="/publish.html">立即发布</a>
+      <a class="btn btn-ghost btn-lg" href="#how">了解流程</a>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="num" id="stat-approved">0</div><div class="label">已上线应用</div></div>
+    <div class="stat"><div class="num" id="stat-pending">0</div><div class="label">等待审核</div></div>
+    <div class="stat"><div class="num">24h</div><div class="label">极速审核</div></div>
+  </div>
+</main>
+
+<section class="section" id="how">
+  <div class="section-title"><h2>三步完成发布</h2><p>从上传到上线，全程透明可控</p></div>
+  <div class="steps">
+    <div class="step"><div class="step-no">1</div><h3>拖入安装包</h3><p>支持 .exe / .msi 等 Windows 安装包文件</p></div>
+    <div class="step"><div class="step-no">2</div><h3>命名并提交</h3><p>为你的应用起一个名字，提交后进入审核队列</p></div>
+    <div class="step"><div class="step-no">3</div><h3>审核通过上线</h3><p>管理员一键审核通过，获取公开直连下载地址</p></div>
+  </div>
+</section>
+
+<section class="section section-dark">
+  <div class="section-title"><h2>平台特色</h2><p>为开发者和用户保驾护航</p></div>
+  <div class="features">
+    <div class="feature"><div class="icon">🛡</div><h3>人工审核</h3><p>每个安装包均经管理员审核后上线，杜绝恶意软件</p></div>
+    <div class="feature"><div class="icon">⚡</div><h3>直连下载</h3><p>审核通过即生成稳定的直连下载地址</p></div>
+    <div class="feature"><div class="icon">📦</div><h3>格式友好</h3><p>支持 exe、msi、zip 等常见分发格式</p></div>
+  </div>
+</section>
+
+<footer class="footer">
+  <p>© 2026 WinForge · Windows 安装包发布与审核平台</p>
+</footer>
+
+<script>
+// 首页展示公开已上线应用数量统计（调用公开接口）
+async function loadStats() {
+  try {
+    const r = await fetch('/api/public/stats');
+    const data = await r.json();
+    document.getElementById('stat-approved').textContent = data.approved ?? 0;
+    document.getElementById('stat-pending').textContent = data.pending ?? 0;
+  } catch (e) {}
+}
+loadStats();
+</script>
+</body>
+</html>

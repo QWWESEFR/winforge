@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>发布安装包 · WinForge</title>
+<link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="/">
+      <span class="brand-logo">⬡</span>
+      <span class="brand-name">WinForge</span>
+      <span class="brand-tag">Windows 软件发布站</span>
+    </a>
+    <a class="btn btn-ghost" href="/">返回首页</a>
+  </div>
+</header>
+
+<main class="page publish-page">
+  <div class="page-head">
+    <h1>发布 Windows 安装包</h1>
+    <p>拖入安装包文件并命名，提交后进入审核队列</p>
+  </div>
+
+  <div class="card publish-card">
+    <!-- 拖拽上传区 -->
+    <div id="drop-zone" class="drop-zone">
+      <div class="drop-inner">
+        <div class="drop-icon">⬆</div>
+        <p class="drop-title">拖拽安装包到此处</p>
+        <p class="drop-sub">或 <span class="link-like" id="browse-link">点击选择文件</span></p>
+        <p class="drop-hint">支持 .exe / .msi / .zip / .7z 等 Windows 安装包格式，最大 200MB</p>
+      </div>
+      <input type="file" id="file-input" hidden>
+    </div>
+
+    <!-- 已选文件信息 -->
+    <div id="file-info" class="file-info hidden">
+      <div class="file-chip">
+        <span class="file-icon">📦</span>
+        <div class="file-meta">
+          <div class="file-name" id="file-name">example.exe</div>
+          <div class="file-size" id="file-size">0 KB</div>
+        </div>
+        <button class="file-remove" id="file-remove" title="移除文件">×</button>
+      </div>
+    </div>
+
+    <!-- 命名 -->
+    <div class="form-row">
+      <label for="pkg-name">应用名称 <em>*</em></label>
+      <input type="text" id="pkg-name" placeholder="给你的安装包起个名字，例如：效率工具箱" maxlength="50">
+      <div class="field-msg" id="name-msg"></div>
+    </div>
+
+    <!-- 提交 -->
+    <button class="btn btn-primary btn-lg btn-block" id="submit-btn" disabled>提交发布</button>
+  </div>
+
+  <!-- 发布结果 -->
+  <div id="result-card" class="card result-card hidden">
+    <div class="result-icon">⏳</div>
+    <h2>发布成功，等待审核</h2>
+    <p id="result-text">你的安装包已进入审核队列，管理员审核通过后将自动上线。</p>
+    <div class="result-status">
+      <span class="badge badge-pending">审核中</span>
+    </div>
+    <div class="result-actions">
+      <a class="btn btn-primary" href="/">返回首页</a>
+      <button class="btn btn-ghost" id="publish-again">再发布一个</button>
+    </div>
+  </div>
+</main>
+
+<footer class="footer"><p>© 2026 WinForge · Windows 安装包发布与审核平台</p></footer>
+
+<script>
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const fileInfo = document.getElementById('file-info');
+const fileNameEl = document.getElementById('file-name');
+const fileSizeEl = document.getElementById('file-size');
+const nameInput = document.getElementById('pkg-name');
+const nameMsg = document.getElementById('name-msg');
+const submitBtn = document.getElementById('submit-btn');
+const resultCard = document.getElementById('result-card');
+const resultText = document.getElementById('result-text');
+const publishCard = document.querySelector('.publish-card');
+
+let selectedFile = null;
+const MAX_SIZE = 200 * 1024 * 1024;
+const BAD_PATTERN = /傻逼|煞笔|妈的|操你|草你|去死|贱人|婊子|狗娘养的|王八蛋|混蛋|他妈|你妈|滚蛋|脑残|智障|白痴|废物|垃圾|丑八怪|不要脸|变态|人渣|败类|畜牲|杂种|野种|fuck|shit|bitch|asshole|damn|cnm|nmd|sb\b|tmd/i;
+
+function fmtSize(bytes) {
+  if (!bytes) return '0 KB';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+  return (bytes/1024/1024).toFixed(2) + ' MB';
+}
+
+function showMsg(el, text, ok) {
+  el.textContent = text || '';
+  el.className = 'field-msg' + (text ? (ok ? ' ok' : ' err') : '');
+}
+
+function resetFile() {
+  selectedFile = null;
+  fileInfo.classList.add('hidden');
+  fileInput.value = '';
+  dropZone.classList.remove('has-file');
+  updateSubmit();
+}
+
+function onFilePicked(f) {
+  if (!f) return;
+  if (!/\.(exe|msi|zip|7z|rar|appx|msix|bat|cmd|sb3|apk|dmg|bin)$/i.test(f.name)) {
+    alert('暂不支持该文件类型，请上传 Windows 安装包（.exe/.msi/.zip 等）');
+    return;
+  }
+  if (f.size > MAX_SIZE) {
+    alert('文件超过 200MB 上限');
+    return;
+  }
+  selectedFile = f;
+  fileNameEl.textContent = f.name;
+  fileSizeEl.textContent = fmtSize(f.size);
+  fileInfo.classList.remove('hidden');
+  dropZone.classList.add('has-file');
+  updateSubmit();
+}
+
+async function validateName() {
+  const name = nameInput.value.trim();
+  if (!name) { showMsg(nameMsg, ''); updateSubmit(); return; }
+  if (BAD_PATTERN.test(name)) { showMsg(nameMsg, '名字包含不当词汇，请换个文明的名字', false); updateSubmit(); return; }
+  try {
+    const r = await fetch('/api/check_name', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name}) });
+    const data = await r.json();
+    if (data.clean) { showMsg(nameMsg, '✓ 名字可用', true); }
+    else { showMsg(nameMsg, data.message || '名字包含不当词汇', false); }
+  } catch(e) { showMsg(nameMsg, ''); }
+  updateSubmit();
+}
+
+function updateSubmit() {
+  const name = nameInput.value.trim();
+  const clean = name && !BAD_PATTERN.test(name);
+  submitBtn.disabled = !(clean && selectedFile);
+}
+
+// 事件绑定
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files.length) onFilePicked(e.dataTransfer.files[0]);
+});
+document.getElementById('browse-link').addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('click', e => { if (e.target.id !== 'browse-link') fileInput.click(); });
+fileInput.addEventListener('change', () => onFilePicked(fileInput.files[0]));
+document.getElementById('file-remove').addEventListener('click', resetFile);
+nameInput.addEventListener('input', () => { validateName(); });
+
+submitBtn.addEventListener('click', async () => {
+  if (submitBtn.disabled) return;
+  const name = nameInput.value.trim();
+  if (!name) { showMsg(nameMsg, '请先为安装包起个名字', false); return; }
+  if (BAD_PATTERN.test(name)) { showMsg(nameMsg, '名字包含不当词汇，请换个文明的名字', false); return; }
+  if (!selectedFile) { alert('请选择要发布的文件'); return; }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = '提交中…';
+  const fd = new FormData();
+  fd.append('name', name);
+  fd.append('file', selectedFile);
+  try {
+    const r = await fetch('/api/publish', { method: 'POST', body: fd });
+    const data = await r.json();
+    if (data.ok) {
+      publishCard.classList.add('hidden');
+      resultCard.classList.remove('hidden');
+      resultText.textContent = `《${name}》已进入审核队列，管理员审核通过后将自动上线。`;
+    } else {
+      alert(data.error || '发布失败，请重试');
+      submitBtn.disabled = false;
+      submitBtn.textContent = '提交发布';
+    }
+  } catch(e) {
+    alert('网络错误，请重试');
+    submitBtn.disabled = false;
+    submitBtn.textContent = '提交发布';
+  }
+});
+
+document.getElementById('publish-again').addEventListener('click', () => {
+  resultCard.classList.add('hidden');
+  publishCard.classList.remove('hidden');
+  nameInput.value = '';
+  resetFile();
+  showMsg(nameMsg, '');
+});
+</script>
+</body>
+</html>
